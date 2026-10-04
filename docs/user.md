@@ -50,18 +50,30 @@ calibration unless mains charging is acceptable until the battery becomes full.
 
 ## Normal operation
 
-While `IDLE`, charging starts only after surplus continuously covers the expected
-charging demand for the configured start duration. While `CHARGING`, it stops
-after sustained grid import for the configured stop duration. Brief threshold
-crossings do not switch the charger.
+While `IDLE`, the controller waits for a small configurable minimum surplus to
+remain available for the configured start duration. It then enters `PROBING`
+and deliberately turns charging on to measure the battery's actual demand.
+
+During the probe, sustained grid import stops charging after the short probe
+stop duration. An unsuccessful probe is followed by a configurable cooldown to
+avoid repeated switching. If useful charging power is observed and there is no
+grid import at the end of the probe, the controller enters `CHARGING`. Normal
+charging stops after grid import lasts for the longer configured stop duration.
 
 The controller owns the configured charger switch. Manually switching it off
-while `CHARGING` returns the controller to `IDLE`; an unexpectedly on switch in
-`IDLE` is turned off. A short settling window allows Home Assistant time to
-report a switch command before treating the reported state as an override.
+while `PROBING` or `CHARGING` returns the controller to `IDLE`; an unexpectedly
+on switch in `IDLE` is turned off. A short settling window allows Home Assistant
+time to report a switch command before treating the reported state as an
+override.
 
-The expected charging demand begins at the configured fallback and is learned
-from measured charging power. Low end-of-charge taper readings are ignored.
+The last observed bulk charging power is retained as a diagnostic. It is learned
+during probes, normal charging, and calibration, but it is not a startup
+threshold. The controller keeps the useful peak from each charging session so
+low end-of-charge taper readings do not replace it.
+
+Full-charge detection also runs during probing and normal charging. If charging
+power remains below the configured full threshold while the charging switch is
+on, the controller anchors the battery estimate at 100% and turns charging off.
 
 The battery estimate uses cumulative charging and protected-load energy. It
 remains an estimate: charging efficiency, meter resets, AC bypass behavior, and
@@ -85,7 +97,7 @@ The integration exposes:
 - estimated battery level;
 - estimated battery energy;
 - controller state;
-- expected charging power;
+- observed bulk charging power;
 - last calibration time;
 - calibration-due status;
 - force-calibration button.
@@ -95,13 +107,16 @@ These entities report controller state; no additional automations are required.
 ## Options
 
 Open the integration's **Configure** dialog to adjust nominal capacity, charging
-efficiency, initial expected demand, start and stop durations, full-detection
+efficiency, minimum surplus and duration before probing, probe duration, quick
+probe-stop duration, probe cooldown, normal stop duration, full-detection
 threshold and duration, periodic calibration interval, and reconnect duration.
 
 ## Troubleshooting
 
 - `CALIBRATING`: the battery model needs a full-charge anchor. Charging may run
   regardless of surplus.
+- `PROBING`: charging is temporarily on so the controller can observe actual
+  demand; sustained import causes a quick stop.
 - `DISCONNECTED`: verify the configured charger switch and cumulative charger
   energy entities are available.
 - Charging stops unexpectedly: check surplus and charging-power entity

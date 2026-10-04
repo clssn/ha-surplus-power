@@ -37,14 +37,15 @@ Required behavior:
 1. Normal surplus charging
 
 When idle:
-- Start charging only when surplus is greater than or equal to the expected charging power continuously for 60 seconds.
-- Expected charging power has an initial configurable fallback value.
-- Once charging has started, learn/update expected charging power from the configured charger-power sensor.
-- Do not let tapering near full charge drag the learned expected charging power down to near zero.
+- Start a charging probe when a small configurable minimum surplus remains available continuously for 60 seconds.
+- Turn charging on during the probe to observe actual demand instead of relying on a fixed estimate.
+- Stop a probe quickly after sustained grid import, initially after 5 seconds, and apply a cooldown before retrying.
+- Continue into normal charging when useful charging power was observed and import is not occurring.
+- Retain the useful peak from each charging session as a diagnostic so tapering does not replace it with a near-zero value.
 
 When charging:
 - Stop charging if configured surplus power is below zero continuously for 60 seconds.
-- Thus startup requires enough surplus to cover expected charger demand, but continuation merely requires no sustained grid import.
+- Thus a probe may briefly import power while discovering current demand, but normal charging merely requires no sustained grid import.
 
 Use asynchronous timers/callbacks rather than polling.
 
@@ -125,6 +126,7 @@ Fail safely with respect to charging:
 - NEEDS_CALIBRATION
 - CALIBRATING
 - IDLE
+- PROBING
 - CHARGING
 
 A dedicated controller class should own the state machine and business logic.
@@ -135,7 +137,7 @@ Use Home Assistant integration-local persistent storage, e.g. `homeassistant.hel
 
 - estimated_energy_wh
 - last_calibration
-- expected_charging_power_w
+- last_charging_power_w
 - previous cumulative charger-energy reading
 - previous cumulative load-energy reading
 - whether a reconnect calibration is required
@@ -150,7 +152,10 @@ Configuration/options should include at least:
 
 - entity IDs for all six source/control entities
 - nominal capacity
-- initial expected charger power
+- minimum surplus before probing, default 50 W
+- probe duration, default 60 s
+- probe import-stop duration, default 5 s
+- probe cooldown, default 5 minutes
 - charging efficiency, default 0.80
 - start-condition duration, default 60 s
 - stop-condition duration, default 60 s
@@ -168,7 +173,7 @@ Initially expose approximately:
 - estimated battery level (%)
 - estimated battery energy (Wh)
 - controller state
-- learned/expected charging power
+- observed bulk charging power
 - last calibration timestamp
 - calibration-due binary sensor
 - manual force-calibration button
@@ -197,12 +202,14 @@ The controller should subscribe to state changes of the relevant HA entities. Av
 
 Before live deployment, implement focused unit tests for at least:
 
-- start after sustained surplus
+- start a probe after sustained surplus
 - short surplus spike does not start charging
+- sustained import aborts a probe quickly
+- unsuccessful probe observes its cooldown
 - stop after sustained import
 - short import spike does not stop charging
-- expected charging power learning
-- low tapering power does not corrupt learned expected charging power
+- bulk charging-power observation
+- low tapering power does not corrupt observed bulk charging power
 - charging energy increases SOC
 - protected-load use decreases SOC
 - cumulative energy sensor reset

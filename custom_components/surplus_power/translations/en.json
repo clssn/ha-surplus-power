@@ -23,8 +23,11 @@
         "data": {
           "capacity_wh": "Nominal capacity (Wh)",
           "charging_efficiency": "Charging efficiency",
-          "initial_charging_power_w": "Initial expected charging power (W)",
+          "minimum_probe_surplus_w": "Minimum surplus before probing (W)",
           "start_duration_s": "Start duration (seconds)",
+          "probe_duration_s": "Probe duration (seconds)",
+          "probe_stop_duration_s": "Probe import stop duration (seconds)",
+          "probe_cooldown_s": "Failed-probe cooldown (seconds)",
           "stop_duration_s": "Stop duration (seconds)",
           "full_power_threshold_w": "Full detection threshold (W)",
           "full_detection_duration_s": "Full detection duration (seconds)",
@@ -39,7 +42,7 @@
       "estimated_soc": { "name": "Estimated battery level" },
       "estimated_energy": { "name": "Estimated battery energy" },
       "controller_state": { "name": "Controller state" },
-      "expected_charging_power": { "name": "Expected charging power" },
+      "observed_charging_power": { "name": "Observed bulk charging power" },
       "last_calibration": { "name": "Last calibration" }
     },
     "binary_sensor": {

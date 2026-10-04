@@ -48,16 +48,24 @@ SENSORS = (
         key="controller_state",
         translation_key="controller_state",
         device_class=SensorDeviceClass.ENUM,
-        options=["disconnected", "needs_calibration", "calibrating", "idle", "charging"],
+        options=[
+            "disconnected",
+            "needs_calibration",
+            "calibrating",
+            "idle",
+            "probing",
+            "charging",
+        ],
         value_fn=lambda runtime: runtime.controller.state.value,
     ),
     SurplusSensorDescription(
+        # Preserve the original entity unique ID across the diagnostic rename.
         key="expected_charging_power",
-        translation_key="expected_charging_power",
+        translation_key="observed_charging_power",
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         suggested_display_precision=1,
-        value_fn=lambda runtime: runtime.controller.persisted.expected_charging_power_w,
+        value_fn=lambda runtime: runtime.controller.persisted.last_charging_power_w,
     ),
     SurplusSensorDescription(
         key="last_calibration",

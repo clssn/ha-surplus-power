@@ -92,17 +92,25 @@ Prefer an explicit state machine:
 - `NEEDS_CALIBRATION`
 - `CALIBRATING`
 - `IDLE`
+- `PROBING`
 - `CHARGING`
 
 Avoid encoding important state implicitly through combinations of booleans.
 
 ## Normal charging rules
 
-Start charging only when:
+Start a charging probe only when:
 
-`surplus >= expected_charging_power`
+`surplus >= minimum_probe_surplus`
 
 continuously for the configured startup duration, initially 60 seconds.
+
+During a probe:
+
+- turn on charging to observe its actual demand
+- stop quickly if sustained grid import begins, initially after 5 seconds
+- apply a cooldown after an unsuccessful probe
+- continue into normal charging only when useful charging power was observed
 
 Stop charging when:
 
@@ -112,17 +120,16 @@ continuously for the configured stop duration, initially 60 seconds.
 
 Short threshold crossings must not trigger switching.
 
-## Expected charging-power learning
+## Charging-power observation
 
-Maintain a persistent estimate of charger demand.
+Maintain the last observed bulk charging power as a persistent diagnostic.
 
-Start from a configurable initial value.
+Do not use a fixed or learned charging-power estimate as a hard startup gate.
 
-Learn from measured charging power once charging is established.
+Observe measured charging power during probing, normal charging, and calibration.
 
-Use smoothing.
-
-Do not allow end-of-charge tapering or near-zero measurements to collapse the learned expected charging power.
+Track the useful session peak so end-of-charge tapering or near-zero measurements
+do not collapse the diagnostic value.
 
 ## Battery model
 
@@ -229,12 +236,14 @@ Use deterministic tests for timing behavior where possible.
 
 Important test cases include:
 
-- sustained surplus starts charging
+- sustained surplus starts a charging probe
 - transient surplus does not
+- sustained import aborts a probe quickly
+- an unsuccessful probe observes its cooldown
 - sustained import stops charging
 - transient import does not
-- learned charger demand
-- tapering does not poison learned charger demand
+- observed bulk charging power
+- tapering does not poison observed charging power
 - charging increases estimated stored energy
 - protected-load consumption decreases it
 - cumulative meter reset

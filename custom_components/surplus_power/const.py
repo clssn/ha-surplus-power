@@ -15,8 +15,11 @@ CONF_LOAD_ENERGY_ENTITY = "load_energy_entity"
 
 CONF_CAPACITY_WH = "capacity_wh"
 CONF_CHARGING_EFFICIENCY = "charging_efficiency"
-CONF_INITIAL_CHARGING_POWER_W = "initial_charging_power_w"
+CONF_MINIMUM_PROBE_SURPLUS_W = "minimum_probe_surplus_w"
 CONF_START_DURATION_S = "start_duration_s"
+CONF_PROBE_DURATION_S = "probe_duration_s"
+CONF_PROBE_STOP_DURATION_S = "probe_stop_duration_s"
+CONF_PROBE_COOLDOWN_S = "probe_cooldown_s"
 CONF_STOP_DURATION_S = "stop_duration_s"
 CONF_FULL_POWER_THRESHOLD_W = "full_power_threshold_w"
 CONF_FULL_DETECTION_DURATION_S = "full_detection_duration_s"
@@ -26,8 +29,11 @@ CONF_RECONNECT_DURATION_S = "reconnect_duration_s"
 DEFAULTS: Final = {
     CONF_CAPACITY_WH: 1056.0,
     CONF_CHARGING_EFFICIENCY: 0.80,
-    CONF_INITIAL_CHARGING_POWER_W: 300.0,
+    CONF_MINIMUM_PROBE_SURPLUS_W: 50.0,
     CONF_START_DURATION_S: 60,
+    CONF_PROBE_DURATION_S: 60,
+    CONF_PROBE_STOP_DURATION_S: 5,
+    CONF_PROBE_COOLDOWN_S: 300,
     CONF_STOP_DURATION_S: 60,
     CONF_FULL_POWER_THRESHOLD_W: 10.0,
     CONF_FULL_DETECTION_DURATION_S: 30,
@@ -48,8 +54,11 @@ def controller_config_from_mapping(data: dict[str, object]):
     return ControllerConfig(
         capacity_wh=float(values[CONF_CAPACITY_WH]),
         charging_efficiency=float(values[CONF_CHARGING_EFFICIENCY]),
-        initial_charging_power_w=float(values[CONF_INITIAL_CHARGING_POWER_W]),
+        minimum_probe_surplus_w=float(values[CONF_MINIMUM_PROBE_SURPLUS_W]),
         start_duration=timedelta(seconds=float(values[CONF_START_DURATION_S])),
+        probe_duration=timedelta(seconds=float(values[CONF_PROBE_DURATION_S])),
+        probe_stop_duration=timedelta(seconds=float(values[CONF_PROBE_STOP_DURATION_S])),
+        probe_cooldown=timedelta(seconds=float(values[CONF_PROBE_COOLDOWN_S])),
         stop_duration=timedelta(seconds=float(values[CONF_STOP_DURATION_S])),
         full_power_threshold_w=float(values[CONF_FULL_POWER_THRESHOLD_W]),
         full_detection_duration=timedelta(seconds=float(values[CONF_FULL_DETECTION_DURATION_S])),
