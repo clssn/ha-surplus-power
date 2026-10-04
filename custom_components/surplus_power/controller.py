@@ -43,6 +43,7 @@ class ControllerConfig:
     full_detection_duration: timedelta = timedelta(seconds=30)
     calibration_interval: timedelta = timedelta(days=7)
     reconnect_duration: timedelta = timedelta(seconds=30)
+    switch_transition_timeout: timedelta = timedelta(seconds=10)
     learning_alpha: float = 0.2
     learning_min_power_w: float = 50.0
 
@@ -55,6 +56,8 @@ class ControllerConfig:
             raise ValueError("initial_charging_power_w must be positive")
         if not 0 < self.learning_alpha <= 1:
             raise ValueError("learning_alpha must be in (0, 1]")
+        if self.switch_transition_timeout <= timedelta(0):
+            raise ValueError("switch_transition_timeout must be positive")
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +146,7 @@ class SurplusPowerController:
         )
         self._condition_since: datetime | None = None
         self._available_since: datetime | None = None
+        self._switch_on_requested_at: datetime | None = None
         self._last_inputs: Inputs | None = None
 
     @property
@@ -158,6 +162,8 @@ class SurplusPowerController:
     @property
     def next_deadline(self) -> datetime | None:
         """Return the next instant at which time alone may cause a transition."""
+        if self.state is ControllerState.CHARGING and self._switch_on_requested_at is not None:
+            return self._switch_on_requested_at + self.config.switch_transition_timeout
         if self._condition_since is not None:
             durations = {
                 ControllerState.IDLE: self.config.start_duration,
@@ -195,6 +201,7 @@ class SurplusPowerController:
             self.persisted.requires_recalibration = True
             self._available_since = None
             self._condition_since = None
+            self._switch_on_requested_at = None
         elif self.state is ControllerState.DISCONNECTED:
             if self._available_since is None:
                 self._available_since = inputs.now
@@ -223,6 +230,11 @@ class SurplusPowerController:
         return ControllerResult(self.state, command, before != self._persistent_fingerprint())
 
     def _update_idle(self, inputs: Inputs) -> ChargerCommand | None:
+        self._switch_on_requested_at = None
+        if inputs.charger_is_on is True:
+            self._condition_since = None
+            return ChargerCommand.TURN_OFF
+
         expected = self.persisted.expected_charging_power_w
         assert expected is not None
         if inputs.surplus_power_w is not None and inputs.surplus_power_w >= expected:
@@ -231,12 +243,28 @@ class SurplusPowerController:
             elif inputs.now - self._condition_since >= self.config.start_duration:
                 self.state = ControllerState.CHARGING
                 self._condition_since = None
+                self._switch_on_requested_at = inputs.now
                 return ChargerCommand.TURN_ON
         else:
             self._condition_since = None
         return None
 
     def _update_charging(self, inputs: Inputs) -> ChargerCommand | None:
+        if inputs.charger_is_on is True:
+            self._switch_on_requested_at = None
+        elif inputs.charger_is_on is False:
+            waiting_for_switch = (
+                self._switch_on_requested_at is not None
+                and inputs.now - self._switch_on_requested_at
+                < self.config.switch_transition_timeout
+            )
+            if waiting_for_switch:
+                return None
+            self.state = ControllerState.IDLE
+            self._condition_since = None
+            self._switch_on_requested_at = None
+            return None
+
         if inputs.surplus_power_w is None or inputs.charger_power_w is None:
             self.state = ControllerState.IDLE
             self._condition_since = None

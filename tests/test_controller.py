@@ -81,6 +81,40 @@ def test_transient_import_does_not_stop_charging() -> None:
     assert result.state is ControllerState.CHARGING
 
 
+def test_manual_switch_off_returns_charging_to_idle() -> None:
+    controller = configured_controller()
+    start_charging(controller)
+    controller.update(snapshot(61, charger_is_on=True))
+
+    result = controller.update(snapshot(62, charger_is_on=False, charger_power_w=0))
+
+    assert result.command is None
+    assert result.state is ControllerState.IDLE
+
+
+def test_idle_turns_off_unexpectedly_on_charger() -> None:
+    controller = configured_controller()
+
+    result = controller.update(snapshot(charger_is_on=True))
+
+    assert result.command is ChargerCommand.TURN_OFF
+    assert result.state is ControllerState.IDLE
+
+
+def test_switch_feedback_delay_is_allowed_after_start_command() -> None:
+    controller = configured_controller(switch_transition_timeout=timedelta(seconds=10))
+    start_charging(controller)
+
+    waiting = controller.update(snapshot(69, charger_is_on=False, charger_power_w=0))
+    assert waiting.command is None
+    assert waiting.state is ControllerState.CHARGING
+    assert controller.next_deadline == NOW + timedelta(seconds=70)
+
+    timed_out = controller.update(snapshot(70, charger_is_on=False, charger_power_w=0))
+    assert timed_out.command is None
+    assert timed_out.state is ControllerState.IDLE
+
+
 def test_expected_power_is_learned_but_taper_is_ignored() -> None:
     controller = configured_controller(learning_alpha=0.5, learning_min_power_w=50)
     start_charging(controller)

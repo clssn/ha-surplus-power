@@ -55,6 +55,11 @@ charging demand for the configured start duration. While `CHARGING`, it stops
 after sustained grid import for the configured stop duration. Brief threshold
 crossings do not switch the charger.
 
+The controller owns the configured charger switch. Manually switching it off
+while `CHARGING` returns the controller to `IDLE`; an unexpectedly on switch in
+`IDLE` is turned off. A short settling window allows Home Assistant time to
+report a switch command before treating the reported state as an override.
+
 The expected charging demand begins at the configured fallback and is learned
 from measured charging power. Low end-of-charge taper readings are ignored.
 
