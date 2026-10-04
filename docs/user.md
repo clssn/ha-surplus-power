@@ -81,10 +81,13 @@ device removal can all affect accuracy.
 
 ## Disconnection and periodic calibration
 
-If the charger is removed or required charger entities become unavailable, the
-controller enters `DISCONNECTED`, sends no charger commands, and requires a new
-calibration. After the charger returns and remains available for the configured
-stabilization duration, calibration starts before normal control resumes.
+If required charger entities become unavailable, the controller first waits for
+the configured disconnect grace period and sends no charger commands. This
+prevents brief entity restoration during a Home Assistant restart from forcing
+calibration. If unavailability persists, it enters `DISCONNECTED` and requires a
+new calibration. After the charger returns and remains available for the
+configured stabilization duration, calibration starts before normal control
+resumes.
 
 Calibration is also forced when the previous successful calibration exceeds the
 configured interval. The **Force calibration** button starts the same process
@@ -109,7 +112,8 @@ These entities report controller state; no additional automations are required.
 Open the integration's **Configure** dialog to adjust nominal capacity, charging
 efficiency, minimum surplus and duration before probing, probe duration, quick
 probe-stop duration, probe cooldown, normal stop duration, full-detection
-threshold and duration, periodic calibration interval, and reconnect duration.
+threshold and duration, periodic calibration interval, disconnect grace period,
+and reconnect duration.
 
 ## Troubleshooting
 

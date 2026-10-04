@@ -18,7 +18,7 @@ async def test_setup_and_unload_while_charger_absent(
     await hass.async_block_till_done()
 
     runtime = hass.data[DOMAIN][entry.entry_id]
-    assert runtime.controller.state.value == "disconnected"
+    assert runtime.controller.state.value == "needs_calibration"
     assert runtime.controller.persisted.requires_recalibration
 
     assert await hass.config_entries.async_unload(entry.entry_id)

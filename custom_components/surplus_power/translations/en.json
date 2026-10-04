@@ -32,6 +32,7 @@
           "full_power_threshold_w": "Full detection threshold (W)",
           "full_detection_duration_s": "Full detection duration (seconds)",
           "calibration_interval_days": "Calibration interval (days)",
+          "disconnect_duration_s": "Disconnect grace period (seconds)",
           "reconnect_duration_s": "Reconnect stabilization (seconds)"
         }
       }

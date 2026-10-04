@@ -46,6 +46,7 @@ class ControllerConfig:
     full_power_threshold_w: float = 10.0
     full_detection_duration: timedelta = timedelta(seconds=30)
     calibration_interval: timedelta = timedelta(days=7)
+    disconnect_duration: timedelta = timedelta(seconds=60)
     reconnect_duration: timedelta = timedelta(seconds=30)
     switch_transition_timeout: timedelta = timedelta(seconds=10)
     minimum_observed_charging_power_w: float = 50.0
@@ -151,6 +152,7 @@ class SurplusPowerController:
             else ControllerState.IDLE
         )
         self._condition_since: datetime | None = None
+        self._unavailable_since: datetime | None = None
         self._available_since: datetime | None = None
         self._switch_on_requested_at: datetime | None = None
         self._probe_started_at: datetime | None = None
@@ -193,6 +195,8 @@ class SurplusPowerController:
             deadlines.append(self._full_power_since + self.config.full_detection_duration)
         if self.state is ControllerState.DISCONNECTED and self._available_since is not None:
             deadlines.append(self._available_since + self.config.reconnect_duration)
+        if self._unavailable_since is not None and self.state is not ControllerState.DISCONNECTED:
+            deadlines.append(self._unavailable_since + self.config.disconnect_duration)
         if self.state is ControllerState.IDLE and self._probe_cooldown_until is not None:
             deadlines.append(self._probe_cooldown_until)
         if self.persisted.last_calibration is not None and not self.calibration_due:
@@ -217,13 +221,33 @@ class SurplusPowerController:
 
         command: ChargerCommand | None = None
         if not inputs.charger_available:
+            if self._unavailable_since is None:
+                self._unavailable_since = inputs.now
+            if (
+                self.state is not ControllerState.DISCONNECTED
+                and inputs.now - self._unavailable_since < self.config.disconnect_duration
+            ):
+                self._last_inputs = inputs
+                return ControllerResult(
+                    self.state,
+                    None,
+                    before != self._persistent_fingerprint(),
+                )
             self.state = ControllerState.DISCONNECTED
             self.persisted.requires_recalibration = True
             self._available_since = None
             self._condition_since = None
             self._switch_on_requested_at = None
             self._reset_charge_session()
-        elif self.state is ControllerState.DISCONNECTED:
+            self._last_inputs = inputs
+            return ControllerResult(
+                self.state,
+                None,
+                before != self._persistent_fingerprint(),
+            )
+
+        self._unavailable_since = None
+        if self.state is ControllerState.DISCONNECTED:
             if self._available_since is None:
                 self._available_since = inputs.now
             elif inputs.now - self._available_since >= self.config.reconnect_duration:

@@ -103,7 +103,8 @@ Sometimes the power station is physically removed.
 In that situation the charging device/entity becomes unavailable, and the protected load is connected directly to mains manually.
 
 If the charger switch or required charger entities become unavailable:
-- enter a DISCONNECTED state
+- allow a short configurable grace period for transient unavailability
+- enter a DISCONNECTED state only if unavailability persists
 - issue no switch commands
 - stop trusting/updating the battery model as though the battery were still connected
 - remember that recalibration is required when it returns
@@ -162,6 +163,7 @@ Configuration/options should include at least:
 - full-charge power threshold, default 10 W
 - full-charge detection duration, default 30 s
 - forced calibration interval, default 7 days
+- disconnect grace period, default 60 s
 - reconnect stabilization duration, default 30 s
 
 Prefer an Options Flow for tunables instead of exposing lots of `number` helpers.
@@ -216,6 +218,7 @@ Before live deployment, implement focused unit tests for at least:
 - full-charge calibration
 - periodic calibration due
 - disconnected state
+- brief unavailability does not force recalibration
 - reconnect requires recalibration
 - HA restart with persisted state
 - missing surplus data while charging

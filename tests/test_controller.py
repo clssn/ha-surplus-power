@@ -214,15 +214,50 @@ def test_periodic_calibration_starts_and_ignores_surplus() -> None:
 
 
 def test_disconnect_issues_no_command_and_reconnect_calibrates() -> None:
-    controller = configured_controller(reconnect_duration=timedelta(seconds=30))
+    controller = configured_controller(
+        disconnect_duration=timedelta(seconds=30),
+        reconnect_duration=timedelta(seconds=30),
+    )
     disconnected = controller.update(snapshot(charger_available=False))
-    assert disconnected.state is ControllerState.DISCONNECTED
+    assert disconnected.state is ControllerState.IDLE
     assert disconnected.command is None
 
-    assert controller.update(snapshot(1)).state is ControllerState.DISCONNECTED
-    result = controller.update(snapshot(31))
+    assert controller.update(snapshot(30, charger_available=False)).state is (
+        ControllerState.DISCONNECTED
+    )
+    assert controller.update(snapshot(31)).state is ControllerState.DISCONNECTED
+    result = controller.update(snapshot(61))
     assert result.state is ControllerState.CALIBRATING
     assert result.command is ChargerCommand.TURN_ON
+
+
+def test_brief_unavailability_does_not_require_recalibration() -> None:
+    controller = configured_controller(disconnect_duration=timedelta(seconds=60))
+
+    unavailable = controller.update(snapshot(charger_available=False))
+    assert unavailable.state is ControllerState.IDLE
+    assert unavailable.command is None
+    assert controller.calibration_due is False
+    assert controller.next_deadline == NOW + timedelta(seconds=60)
+
+    recovered = controller.update(snapshot(30))
+    assert recovered.state is ControllerState.IDLE
+    assert recovered.command is None
+    assert controller.calibration_due is False
+
+
+def test_brief_unavailability_during_charging_resumes_charging() -> None:
+    controller = configured_controller(disconnect_duration=timedelta(seconds=60))
+    start_charging(controller)
+
+    unavailable = controller.update(snapshot(121, charger_available=False))
+    assert unavailable.state is ControllerState.CHARGING
+    assert unavailable.command is None
+
+    recovered = controller.update(snapshot(150, charger_is_on=True))
+    assert recovered.state is ControllerState.CHARGING
+    assert recovered.command is None
+    assert controller.calibration_due is False
 
 
 @pytest.mark.parametrize("missing", ["surplus_power_w", "charger_power_w"])

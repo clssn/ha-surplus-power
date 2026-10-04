@@ -24,6 +24,7 @@ CONF_STOP_DURATION_S = "stop_duration_s"
 CONF_FULL_POWER_THRESHOLD_W = "full_power_threshold_w"
 CONF_FULL_DETECTION_DURATION_S = "full_detection_duration_s"
 CONF_CALIBRATION_INTERVAL_DAYS = "calibration_interval_days"
+CONF_DISCONNECT_DURATION_S = "disconnect_duration_s"
 CONF_RECONNECT_DURATION_S = "reconnect_duration_s"
 
 DEFAULTS: Final = {
@@ -38,6 +39,7 @@ DEFAULTS: Final = {
     CONF_FULL_POWER_THRESHOLD_W: 10.0,
     CONF_FULL_DETECTION_DURATION_S: 30,
     CONF_CALIBRATION_INTERVAL_DAYS: 7,
+    CONF_DISCONNECT_DURATION_S: 60,
     CONF_RECONNECT_DURATION_S: 30,
 }
 
@@ -63,5 +65,6 @@ def controller_config_from_mapping(data: dict[str, object]):
         full_power_threshold_w=float(values[CONF_FULL_POWER_THRESHOLD_W]),
         full_detection_duration=timedelta(seconds=float(values[CONF_FULL_DETECTION_DURATION_S])),
         calibration_interval=timedelta(days=float(values[CONF_CALIBRATION_INTERVAL_DAYS])),
+        disconnect_duration=timedelta(seconds=float(values[CONF_DISCONNECT_DURATION_S])),
         reconnect_duration=timedelta(seconds=float(values[CONF_RECONNECT_DURATION_S])),
     )

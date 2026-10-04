@@ -177,9 +177,13 @@ Once a forced calibration starts, continue until full detection succeeds unless 
 The power station is sometimes physically removed.
 
 If required charger entities become unavailable:
-- enter `DISCONNECTED`
-- stop issuing charger commands
+- stop issuing charger commands immediately
+- wait for a configurable disconnect grace period, initially 60 seconds
+- enter `DISCONNECTED` only if unavailability persists beyond the grace period
 - mark the model as requiring recalibration
+
+Brief unavailability, such as entity restoration during a Home Assistant
+restart, must not by itself invalidate the battery model.
 
 After the charger becomes available again:
 - require stable availability for a configurable interval, initially 30 seconds
@@ -250,6 +254,7 @@ Important test cases include:
 - calibration reaches 100%
 - weekly calibration
 - disconnect
+- brief unavailability does not force recalibration
 - reconnect calibration
 - persistence across restart
 - sensor unavailability
