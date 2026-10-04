@@ -23,7 +23,8 @@ select **Surplus Power**.
 
 Select these six existing Home Assistant entities:
 
-- surplus/export power, where positive values mean export;
+- site net grid-balance power—not raw solar generation—where positive values
+  mean export and negative values mean grid import;
 - power-station charging-input switch;
 - charging-input instantaneous power;
 - charging-input cumulative energy;
@@ -32,6 +33,14 @@ Select these six existing Home Assistant entities:
 
 Double-check the charging switch selection. It is the integration's only
 actuator.
+
+To review or change these selections later, open **Settings → Devices &
+services → Surplus Power**, open the integration entry's menu, and choose
+**Reconfigure**. The form displays all current selections. The net grid entity
+must report positive values for export and negative values for grid import; a
+sensor reporting positive household consumption has the wrong polarity.
+Changing charger or cumulative-energy measurements requires a fresh calibration;
+correcting only the surplus or protected-load power selection does not.
 
 ## First start and calibration
 

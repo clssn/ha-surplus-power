@@ -4,7 +4,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .const import DOMAIN, PLATFORMS
+from .const import (
+    CONF_CHARGER_ENERGY_ENTITY,
+    CONF_CHARGER_POWER_ENTITY,
+    CONF_CHARGER_SWITCH_ENTITY,
+    CONF_LOAD_ENERGY_ENTITY,
+    DOMAIN,
+    PLATFORMS,
+)
+
+CALIBRATION_ENTITY_KEYS = (
+    CONF_CHARGER_SWITCH_ENTITY,
+    CONF_CHARGER_POWER_ENTITY,
+    CONF_CHARGER_ENERGY_ENTITY,
+    CONF_LOAD_ENERGY_ENTITY,
+)
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -36,4 +50,19 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload after options change."""
+    runtime: SurplusPowerRuntime | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if runtime is not None:
+        new_settings = dict(entry.data) | dict(entry.options)
+        if any(
+            runtime.settings.get(key) != new_settings.get(key) for key in CALIBRATION_ENTITY_KEYS
+        ):
+            runtime.controller.request_calibration()
+        if runtime.settings.get(CONF_CHARGER_ENERGY_ENTITY) != new_settings.get(
+            CONF_CHARGER_ENERGY_ENTITY
+        ):
+            runtime.controller.persisted.previous_charger_energy_kwh = None
+        if runtime.settings.get(CONF_LOAD_ENERGY_ENTITY) != new_settings.get(
+            CONF_LOAD_ENERGY_ENTITY
+        ):
+            runtime.controller.persisted.previous_load_energy_kwh = None
     await hass.config_entries.async_reload(entry.entry_id)

@@ -4,16 +4,47 @@
     "step": {
       "user": {
         "title": "Configure Surplus Power",
-        "description": "Select the charger and read-only measurement entities. Only the charger input switch will ever be controlled.",
+        "description": "Select the net grid balance, charger, and protected-load entities. Only the charger input switch will ever be controlled.",
         "data": {
-          "surplus_power_entity": "Surplus power",
+          "surplus_power_entity": "Net grid power (positive export)",
           "charger_switch_entity": "Charger input switch",
           "charger_power_entity": "Charger input power",
           "charger_energy_entity": "Charger input energy",
           "load_power_entity": "Protected-load power (read only)",
           "load_energy_entity": "Protected-load energy (read only)"
+        },
+        "data_description": {
+          "surplus_power_entity": "Select the site's net grid balance, not raw solar production. It must be positive when exporting to the grid and negative when importing from it.",
+          "charger_switch_entity": "The switch supplying AC charging input to the battery. This is the integration's only controlled entity.",
+          "charger_power_entity": "Instantaneous power drawn through the battery's charging input.",
+          "charger_energy_entity": "Cumulative energy delivered through the battery's charging input, reported in Wh or kWh.",
+          "load_power_entity": "Instantaneous power consumed by the protected load. This entity is read only.",
+          "load_energy_entity": "Cumulative energy consumed by the protected load, reported in Wh or kWh. This entity is read only."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure source entities",
+        "description": "Review or change the net grid balance, charger, and protected-load entities. Only the charger input switch will ever be controlled.",
+        "data": {
+          "surplus_power_entity": "Net grid power (positive export)",
+          "charger_switch_entity": "Charger input switch",
+          "charger_power_entity": "Charger input power",
+          "charger_energy_entity": "Charger input energy",
+          "load_power_entity": "Protected-load power (read only)",
+          "load_energy_entity": "Protected-load energy (read only)"
+        },
+        "data_description": {
+          "surplus_power_entity": "Select the site's net grid balance, not raw solar production. It must be positive when exporting to the grid and negative when importing from it.",
+          "charger_switch_entity": "The switch supplying AC charging input to the battery. This is the integration's only controlled entity.",
+          "charger_power_entity": "Instantaneous power drawn through the battery's charging input.",
+          "charger_energy_entity": "Cumulative energy delivered through the battery's charging input, reported in Wh or kWh.",
+          "load_power_entity": "Instantaneous power consumed by the protected load. This entity is read only.",
+          "load_energy_entity": "Cumulative energy consumed by the protected load, reported in Wh or kWh. This entity is read only."
         }
       }
+    },
+    "abort": {
+      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
     }
   },
   "options": {
@@ -34,6 +65,9 @@
           "calibration_interval_days": "Calibration interval (days)",
           "disconnect_duration_s": "Disconnect grace period (seconds)",
           "reconnect_duration_s": "Reconnect stabilization (seconds)"
+        },
+        "data_description": {
+          "minimum_probe_surplus_w": "Minimum positive net grid export required before the startup timer begins."
         }
       }
     }

@@ -11,6 +11,10 @@ separate actuator command.
 storage, timers, and services to the controller. It serializes refreshes and
 rejects configured actuator entity IDs outside the `switch` domain.
 
+The config flow supports native reconfiguration so users can inspect and update
+all six entity roles without removing the entry. Changing the charger switch
+also updates the entry's unique ID.
+
 The entity platforms are diagnostic views over the runtime. They do not contain
 control logic.
 

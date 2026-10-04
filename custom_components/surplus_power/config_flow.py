@@ -75,6 +75,26 @@ class SurplusPowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title="Surplus Power", data=user_input)
         return self.async_show_form(step_id="user", data_schema=_entity_schema())
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Show and update the source entities for an existing entry."""
+        entry = self._get_reconfigure_entry()
+        if user_input is not None:
+            charger_switch = user_input[CONF_CHARGER_SWITCH_ENTITY]
+            if charger_switch != entry.unique_id:
+                await self.async_set_unique_id(charger_switch)
+                self._abort_if_unique_id_configured()
+            return self.async_update_reload_and_abort(
+                entry,
+                unique_id=charger_switch,
+                data_updates=user_input,
+            )
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=_entity_schema(dict(entry.data)),
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(
@@ -97,10 +117,11 @@ class SurplusPowerOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(step_id="init", data_schema=_options_schema(current))
 
 
-def _entity_schema() -> vol.Schema:
+def _entity_schema(current: dict[str, object] | None = None) -> vol.Schema:
+    current = current or {}
     return vol.Schema(
         {
-            vol.Required(key): selector.EntitySelector(
+            vol.Required(key, default=current.get(key, vol.UNDEFINED)): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=platform)
             )
             for key, platform in ENTITY_FIELDS.items()

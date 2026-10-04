@@ -149,6 +149,11 @@ Do not create HA input helpers just to persist internal controller state.
 
 Use a normal Home Assistant config entry/config flow.
 
+Support Home Assistant's native reconfigure flow so all selected entity IDs are
+visible and editable after initial setup. Describe the surplus input explicitly
+as site net grid-balance power with positive export and negative import; raw PV
+generation or positive-import consumption sensors are not suitable as-is.
+
 Configuration/options should include at least:
 
 - entity IDs for all six source/control entities
