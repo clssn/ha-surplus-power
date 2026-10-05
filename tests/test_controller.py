@@ -178,15 +178,75 @@ def test_negative_meter_delta_is_not_applied() -> None:
 
 def test_full_charge_calibration() -> None:
     controller = SurplusPowerController(ControllerConfig())
-    first = controller.update(snapshot(charger_power_w=5))
+    first = controller.update(snapshot(charger_power_w=5, surplus_power_w=-100))
     assert first.command is ChargerCommand.TURN_ON
     assert first.state is ControllerState.CALIBRATING
-    controller.update(snapshot(1, charger_is_on=True, charger_power_w=5))
-    result = controller.update(snapshot(31, charger_is_on=True, charger_power_w=5))
+    controller.update(snapshot(1, charger_is_on=True, charger_power_w=5, surplus_power_w=-100))
+    result = controller.update(
+        snapshot(31, charger_is_on=True, charger_power_w=5, surplus_power_w=-100)
+    )
     assert result.command is ChargerCommand.TURN_OFF
     assert result.state is ControllerState.IDLE
     assert controller.estimated_soc == 100
     assert controller.persisted.last_calibration == NOW + timedelta(seconds=31)
+
+
+def test_full_battery_keeps_input_on_while_exporting() -> None:
+    controller = SurplusPowerController(ControllerConfig())
+    controller.update(snapshot(charger_power_w=5))
+    controller.update(snapshot(1, charger_is_on=True, charger_power_w=5))
+
+    full = controller.update(snapshot(31, charger_is_on=True, charger_power_w=5))
+    assert full.command is None
+    assert full.state is ControllerState.FULL
+    assert controller.estimated_soc == 100
+
+    still_full = controller.update(
+        snapshot(120, charger_is_on=True, charger_power_w=5, surplus_power_w=100)
+    )
+    assert still_full.command is None
+    assert still_full.state is ControllerState.FULL
+
+
+def test_sustained_import_turns_off_full_battery_input() -> None:
+    controller = SurplusPowerController(ControllerConfig())
+    controller.update(snapshot(charger_power_w=5))
+    controller.update(snapshot(1, charger_is_on=True, charger_power_w=5))
+    controller.update(snapshot(31, charger_is_on=True, charger_power_w=5))
+
+    controller.update(snapshot(32, charger_is_on=True, charger_power_w=5, surplus_power_w=-1))
+    stopped = controller.update(
+        snapshot(92, charger_is_on=True, charger_power_w=5, surplus_power_w=-1)
+    )
+    assert stopped.command is ChargerCommand.TURN_OFF
+    assert stopped.state is ControllerState.IDLE
+
+
+def test_transient_import_keeps_full_battery_input_on() -> None:
+    controller = SurplusPowerController(ControllerConfig())
+    controller.update(snapshot(charger_power_w=5))
+    controller.update(snapshot(1, charger_is_on=True, charger_power_w=5))
+    controller.update(snapshot(31, charger_is_on=True, charger_power_w=5))
+
+    controller.update(snapshot(32, charger_is_on=True, charger_power_w=5, surplus_power_w=-1))
+    recovered = controller.update(
+        snapshot(60, charger_is_on=True, charger_power_w=5, surplus_power_w=1)
+    )
+    assert recovered.command is None
+    assert recovered.state is ControllerState.FULL
+
+
+def test_full_battery_returns_to_charging_when_power_rises() -> None:
+    controller = SurplusPowerController(ControllerConfig())
+    controller.update(snapshot(charger_power_w=5))
+    controller.update(snapshot(1, charger_is_on=True, charger_power_w=5))
+    controller.update(snapshot(31, charger_is_on=True, charger_power_w=5))
+
+    charging = controller.update(
+        snapshot(32, charger_is_on=True, charger_power_w=100, surplus_power_w=100)
+    )
+    assert charging.command is None
+    assert charging.state is ControllerState.CHARGING
 
 
 def test_full_detection_waits_for_switch_feedback() -> None:

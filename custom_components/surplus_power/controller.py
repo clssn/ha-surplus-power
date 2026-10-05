@@ -22,6 +22,7 @@ class ControllerState(StrEnum):
     IDLE = "idle"
     PROBING = "probing"
     CHARGING = "charging"
+    FULL = "full"
 
 
 class ChargerCommand(StrEnum):
@@ -187,6 +188,7 @@ class SurplusPowerController:
                 ControllerState.IDLE: self.config.start_duration,
                 ControllerState.PROBING: self.config.probe_stop_duration,
                 ControllerState.CHARGING: self.config.stop_duration,
+                ControllerState.FULL: self.config.stop_duration,
             }
             duration = durations.get(self.state)
             if duration is not None:
@@ -274,6 +276,8 @@ class SurplusPowerController:
             command = self._update_probing(inputs)
         elif self.state is ControllerState.CHARGING:
             command = self._update_charging(inputs)
+        elif self.state is ControllerState.FULL:
+            command = self._update_full(inputs)
 
         self._last_inputs = inputs
         return ControllerResult(self.state, command, before != self._persistent_fingerprint())
@@ -315,7 +319,7 @@ class SurplusPowerController:
 
         self._observe_charging_power(inputs.charger_power_w)
         if self._full_power_detected(inputs):
-            return self._complete_full_detection(inputs.now)
+            return self._complete_full_detection(inputs)
 
         if inputs.surplus_power_w < 0:
             if self._condition_since is None:
@@ -352,7 +356,7 @@ class SurplusPowerController:
 
         self._observe_charging_power(inputs.charger_power_w)
         if self._full_power_detected(inputs):
-            return self._complete_full_detection(inputs.now)
+            return self._complete_full_detection(inputs)
         if inputs.surplus_power_w < 0:
             if self._condition_since is None:
                 self._condition_since = inputs.now
@@ -369,9 +373,38 @@ class SurplusPowerController:
         if inputs.charger_power_w is not None:
             self._observe_charging_power(inputs.charger_power_w)
         if self._full_power_detected(inputs):
-            return self._complete_full_detection(inputs.now)
+            return self._complete_full_detection(inputs)
         if inputs.charger_is_on is not True:
             return ChargerCommand.TURN_ON
+        return None
+
+    def _update_full(self, inputs: Inputs) -> ChargerCommand | None:
+        if inputs.charger_is_on is False:
+            self.state = ControllerState.IDLE
+            self._condition_since = None
+            return None
+        if inputs.surplus_power_w is None or inputs.charger_power_w is None:
+            self.state = ControllerState.IDLE
+            self._condition_since = None
+            return ChargerCommand.TURN_OFF
+
+        self.persisted.estimated_energy_wh = self.config.capacity_wh
+        if inputs.charger_power_w >= self.config.minimum_observed_charging_power_w:
+            self.state = ControllerState.CHARGING
+            self._condition_since = None
+            self._session_peak_power_w = None
+            self._observe_charging_power(inputs.charger_power_w)
+            return None
+
+        if inputs.surplus_power_w < 0:
+            if self._condition_since is None:
+                self._condition_since = inputs.now
+            elif inputs.now - self._condition_since >= self.config.stop_duration:
+                self.state = ControllerState.IDLE
+                self._condition_since = None
+                return ChargerCommand.TURN_OFF
+        else:
+            self._condition_since = None
         return None
 
     def _observe_charging_power(self, power_w: float) -> None:
@@ -394,14 +427,17 @@ class SurplusPowerController:
         self._full_power_since = None
         return False
 
-    def _complete_full_detection(self, now: datetime) -> ChargerCommand:
+    def _complete_full_detection(self, inputs: Inputs) -> ChargerCommand | None:
         self.persisted.estimated_energy_wh = self.config.capacity_wh
-        self.persisted.last_calibration = now
+        self.persisted.last_calibration = inputs.now
         self.persisted.requires_recalibration = False
-        self.state = ControllerState.IDLE
         self._condition_since = None
         self._probe_cooldown_until = None
         self._reset_charge_session()
+        if inputs.surplus_power_w is not None and inputs.surplus_power_w >= 0:
+            self.state = ControllerState.FULL
+            return None
+        self.state = ControllerState.IDLE
         return ChargerCommand.TURN_OFF
 
     def _switch_feedback_ready(self, inputs: Inputs) -> bool:

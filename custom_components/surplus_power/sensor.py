@@ -55,6 +55,7 @@ SENSORS = (
             "idle",
             "probing",
             "charging",
+            "full",
         ],
         value_fn=lambda runtime: runtime.controller.state.value,
     ),

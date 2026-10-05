@@ -86,7 +86,8 @@ Then:
 - set estimated battery energy = capacity_wh
 - store calibration timestamp
 - stop calibration
-- switch charger input OFF
+- keep charger input ON in a FULL state while net export remains available
+- switch charger input OFF after sustained grid import or missing feedback
 - resume normal control
 
 4. Periodic forced calibration
@@ -129,6 +130,7 @@ Fail safely with respect to charging:
 - IDLE
 - PROBING
 - CHARGING
+- FULL
 
 A dedicated controller class should own the state machine and business logic.
 

@@ -94,6 +94,7 @@ Prefer an explicit state machine:
 - `IDLE`
 - `PROBING`
 - `CHARGING`
+- `FULL`
 
 Avoid encoding important state implicitly through combinations of booleans.
 
@@ -163,7 +164,8 @@ When charger input power remains below the configured full-detection threshold, 
 - set battery estimate to nominal capacity
 - update last calibration timestamp
 - finish calibration
-- switch charger input OFF
+- keep charger input ON while net export remains available
+- switch charger input OFF after sustained grid import or missing feedback
 - return to normal operation
 
 ## Forced calibration

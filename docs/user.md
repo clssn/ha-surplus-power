@@ -51,8 +51,10 @@ power.
 
 When charging power remains below the full-detection threshold for the configured
 duration, the controller considers the battery full. It sets estimated energy to
-the nominal capacity, records the calibration time, turns charging input off,
-and enters `IDLE`.
+the nominal capacity and records the calibration time. If net export is still
+available, it enters `FULL` and leaves charging input on to avoid cycling the
+switch. After sustained grid import, or when required feedback is missing, it
+turns charging input off and enters `IDLE`.
 
 Calibration ignores surplus restrictions. Do not start initial or manual
 calibration unless mains charging is acceptable until the battery becomes full.
@@ -130,6 +132,8 @@ and reconnect duration.
   regardless of surplus.
 - `PROBING`: charging is temporarily on so the controller can observe actual
   demand; sustained import causes a quick stop.
+- `FULL`: the battery is full and charging input remains on while net export is
+  available, avoiding repeated off/probe/on cycles.
 - `DISCONNECTED`: verify the configured charger switch and cumulative charger
   energy entities are available.
 - Charging stops unexpectedly: check surplus and charging-power entity
