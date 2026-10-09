@@ -153,12 +153,17 @@ Do not silently interpret negative cumulative-energy deltas as real energy flow.
 
 The power station may perform AC bypass/pass-through while simultaneously charging and powering the load. Keep this part of the model isolated enough to change later if measurements show that simple accounting is inaccurate.
 
+Maintain a configurable minimum reserve to protect the critical load from power
+loss. When estimated SOC reaches 20%, initially, force charging regardless of
+surplus until a 30% recovery target is reached. This hysteresis must prevent
+frequent charger switching.
+
 If both protected-load power and cumulative-energy measurements remain
 unavailable for 60 seconds, treat that as physical evidence that the battery is
-empty: reset the estimate to zero and force charging. Once both measurements
-have been stable for 30 seconds, charge to a configurable safe reserve,
-initially 20%, before returning to surplus-only operation. Do not infer an empty
-battery from one missing measurement or a brief outage.
+already empty: reset the estimate to zero and use the same forced reserve
+recovery. Require both measurements to remain stable for 30 seconds before
+ending recovery. Do not infer an empty battery from one missing measurement or
+a brief outage.
 
 ## Full-charge calibration
 

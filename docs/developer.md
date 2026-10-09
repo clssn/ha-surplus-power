@@ -61,7 +61,8 @@ level. Keep implementation details out of the commit message.
 
 Pure controller tests cover probe admission, fast probe abort and cooldown,
 normal and full-battery hysteresis, calibration, bulk-power observation, cumulative
-energy accounting, empty-battery recovery, disconnect grace and reconnect
+energy accounting, proactive reserve hysteresis, empty-battery recovery,
+disconnect grace and reconnect
 behavior, persistence, and
 unavailable sensor failure modes. Home Assistant tests cover config-flow uniqueness,
 setup/unload behavior, unit conversion, and the charger service-call boundary.

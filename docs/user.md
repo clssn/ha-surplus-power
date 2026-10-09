@@ -90,13 +90,17 @@ The battery estimate uses cumulative charging and protected-load energy. It
 remains an estimate: charging efficiency, meter resets, AC bypass behavior, and
 device removal can all affect accuracy.
 
+When estimated charge reaches the configured minimum reserve (20% by default),
+the controller enters `RECOVERING` and turns charging on even without surplus.
+It continues to a higher recovery target (30% by default) before returning to
+normal surplus control. This hysteresis protects the load from battery shutdown
+without rapidly cycling the charger.
+
 If both protected-load power and protected-load cumulative energy disappear for
 the configured outage duration, the controller treats this as evidence that a
-battery-powered meter lost power because the battery is empty. It resets the
-estimate to zero and enters `RECOVERING`, turning charging on even without
-surplus. Once both load meters are stable again and the configured reserve has
-been restored (20% by default), charging returns to normal surplus control. A
-single missing meter or a brief outage does not trigger recovery.
+battery-powered meter lost power because the estimate was wrong and the battery
+is already empty. It resets the estimate to zero and invokes the same reserve
+recovery. A single missing meter or a brief outage does not trigger recovery.
 
 ## Disconnection and periodic calibration
 
@@ -132,8 +136,8 @@ Open the integration's **Configure** dialog to adjust nominal capacity, charging
 efficiency, minimum surplus and duration before probing, probe duration, quick
 probe-stop duration, probe cooldown, normal stop duration, full-detection
 threshold and duration, periodic calibration interval, disconnect grace period,
-reconnect duration, empty-battery outage and meter-stabilization durations, and
-the recovery reserve target.
+reconnect duration, minimum reserve and recovery target, and empty-battery
+outage and meter-stabilization durations.
 
 ## Troubleshooting
 
@@ -141,8 +145,8 @@ the recovery reserve target.
   regardless of surplus.
 - `PROBING`: charging is temporarily on so the controller can observe actual
   demand; sustained import causes a quick stop.
-- `RECOVERING`: both battery-powered load meters indicated depletion; charging
-  is forced until a safe reserve is restored and the meters are stable.
+- `RECOVERING`: the estimate reached the minimum reserve, or both load meters
+  indicated depletion; charging is forced to the higher recovery target.
 - `FULL`: the battery is full and charging input remains on while net export is
   available, avoiding repeated off/probe/on cycles.
 - `DISCONNECTED`: verify the configured charger switch and cumulative charger

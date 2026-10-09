@@ -52,7 +52,8 @@ class ControllerConfig:
     reconnect_duration: timedelta = timedelta(seconds=30)
     load_outage_duration: timedelta = timedelta(seconds=60)
     load_recovery_duration: timedelta = timedelta(seconds=30)
-    recovery_target_fraction: float = 0.20
+    reserve_start_fraction: float = 0.20
+    recovery_target_fraction: float = 0.30
     switch_transition_timeout: timedelta = timedelta(seconds=10)
     minimum_observed_charging_power_w: float = 50.0
 
@@ -76,8 +77,10 @@ class ControllerConfig:
             raise ValueError("load_outage_duration must be positive")
         if self.load_recovery_duration < timedelta(0):
             raise ValueError("load_recovery_duration must not be negative")
-        if not 0 < self.recovery_target_fraction <= 1:
-            raise ValueError("recovery_target_fraction must be in (0, 1]")
+        if not 0 < self.reserve_start_fraction <= 1:
+            raise ValueError("reserve_start_fraction must be in (0, 1]")
+        if not self.reserve_start_fraction < self.recovery_target_fraction <= 1:
+            raise ValueError("recovery_target_fraction must be above the reserve start")
 
 
 @dataclass(frozen=True, slots=True)
@@ -289,6 +292,7 @@ class SurplusPowerController:
             self._reset_charge_session()
 
         self._update_load_outage(inputs)
+        self._start_reserve_recovery_if_needed()
 
         if self.state is ControllerState.NEEDS_CALIBRATION and inputs.charger_available:
             self.state = ControllerState.CALIBRATING
@@ -576,6 +580,22 @@ class SurplusPowerController:
                 self._load_available_since = inputs.now
         else:
             self._load_available_since = None
+
+    def _start_reserve_recovery_if_needed(self) -> None:
+        """Force charging before the protected load can lose battery power."""
+        if self.state not in {
+            ControllerState.IDLE,
+            ControllerState.PROBING,
+            ControllerState.CHARGING,
+        }:
+            return
+        reserve_start_wh = self.config.capacity_wh * self.config.reserve_start_fraction
+        if self.persisted.estimated_energy_wh > reserve_start_wh:
+            return
+        self.persisted.recovery_required = True
+        self.state = ControllerState.RECOVERING
+        self._condition_since = None
+        self._reset_charge_session()
 
     @staticmethod
     def _positive_delta(current: float | None, previous: float | None) -> float:

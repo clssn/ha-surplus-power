@@ -28,6 +28,7 @@ CONF_DISCONNECT_DURATION_S = "disconnect_duration_s"
 CONF_RECONNECT_DURATION_S = "reconnect_duration_s"
 CONF_LOAD_OUTAGE_DURATION_S = "load_outage_duration_s"
 CONF_LOAD_RECOVERY_DURATION_S = "load_recovery_duration_s"
+CONF_RESERVE_START_PERCENT = "reserve_start_percent"
 CONF_RECOVERY_TARGET_PERCENT = "recovery_target_percent"
 
 DEFAULTS: Final = {
@@ -46,7 +47,8 @@ DEFAULTS: Final = {
     CONF_RECONNECT_DURATION_S: 30,
     CONF_LOAD_OUTAGE_DURATION_S: 60,
     CONF_LOAD_RECOVERY_DURATION_S: 30,
-    CONF_RECOVERY_TARGET_PERCENT: 20,
+    CONF_RESERVE_START_PERCENT: 20,
+    CONF_RECOVERY_TARGET_PERCENT: 30,
 }
 
 STORAGE_VERSION = 1
@@ -59,6 +61,12 @@ def controller_config_from_mapping(data: dict[str, object]):
     from .controller import ControllerConfig
 
     values = DEFAULTS | data
+    recovery_target_percent = float(values[CONF_RECOVERY_TARGET_PERCENT])
+    if CONF_RESERVE_START_PERCENT not in data:
+        recovery_target_percent = max(
+            recovery_target_percent,
+            float(DEFAULTS[CONF_RECOVERY_TARGET_PERCENT]),
+        )
     return ControllerConfig(
         capacity_wh=float(values[CONF_CAPACITY_WH]),
         charging_efficiency=float(values[CONF_CHARGING_EFFICIENCY]),
@@ -75,5 +83,6 @@ def controller_config_from_mapping(data: dict[str, object]):
         reconnect_duration=timedelta(seconds=float(values[CONF_RECONNECT_DURATION_S])),
         load_outage_duration=timedelta(seconds=float(values[CONF_LOAD_OUTAGE_DURATION_S])),
         load_recovery_duration=timedelta(seconds=float(values[CONF_LOAD_RECOVERY_DURATION_S])),
-        recovery_target_fraction=float(values[CONF_RECOVERY_TARGET_PERCENT]) / 100,
+        reserve_start_fraction=float(values[CONF_RESERVE_START_PERCENT]) / 100,
+        recovery_target_fraction=recovery_target_percent / 100,
     )

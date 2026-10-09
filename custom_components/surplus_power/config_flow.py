@@ -30,6 +30,7 @@ from .const import (
     CONF_PROBE_STOP_DURATION_S,
     CONF_RECONNECT_DURATION_S,
     CONF_RECOVERY_TARGET_PERCENT,
+    CONF_RESERVE_START_PERCENT,
     CONF_START_DURATION_S,
     CONF_STOP_DURATION_S,
     CONF_SURPLUS_POWER_ENTITY,
@@ -62,6 +63,7 @@ OPTION_LIMITS = {
     CONF_RECONNECT_DURATION_S: (0, 3600, 1),
     CONF_LOAD_OUTAGE_DURATION_S: (1, 3600, 1),
     CONF_LOAD_RECOVERY_DURATION_S: (0, 3600, 1),
+    CONF_RESERVE_START_PERCENT: (1, 100, 1),
     CONF_RECOVERY_TARGET_PERCENT: (1, 100, 1),
 }
 
@@ -118,6 +120,12 @@ class SurplusPowerOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         """Edit controller options."""
         if user_input is not None:
+            if user_input[CONF_RESERVE_START_PERCENT] >= user_input[CONF_RECOVERY_TARGET_PERCENT]:
+                return self.async_show_form(
+                    step_id="init",
+                    data_schema=_options_schema(user_input),
+                    errors={"base": "reserve_target_too_low"},
+                )
             return self.async_create_entry(title="", data=user_input)
         current = DEFAULTS | dict(self.config_entry.options)
         return self.async_show_form(step_id="init", data_schema=_options_schema(current))

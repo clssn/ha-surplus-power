@@ -48,6 +48,9 @@
     }
   },
   "options": {
+    "error": {
+      "reserve_target_too_low": "The reserve recovery target must be higher than the minimum reserve."
+    },
     "step": {
       "init": {
         "title": "Controller options",
@@ -64,16 +67,18 @@
           "full_detection_duration_s": "Full detection duration (seconds)",
           "calibration_interval_days": "Calibration interval (days)",
           "disconnect_duration_s": "Disconnect grace period (seconds)",
-          "reconnect_duration_s": "Reconnect stabilization (seconds)"
-          ,"load_outage_duration_s": "Empty-battery meter outage (seconds)"
-          ,"load_recovery_duration_s": "Load-meter recovery stabilization (seconds)"
-          ,"recovery_target_percent": "Empty-battery recovery target (%)"
+          "reconnect_duration_s": "Reconnect stabilization (seconds)",
+          "load_outage_duration_s": "Empty-battery meter outage (seconds)",
+          "load_recovery_duration_s": "Load-meter recovery stabilization (seconds)",
+          "reserve_start_percent": "Minimum battery reserve (%)",
+          "recovery_target_percent": "Reserve recovery target (%)"
         },
         "data_description": {
-          "minimum_probe_surplus_w": "Minimum positive net grid export required before the startup timer begins."
-          ,"load_outage_duration_s": "How long both protected-load meters must be unavailable before the battery is treated as empty."
-          ,"load_recovery_duration_s": "How long both protected-load meters must remain available before reserve recovery may finish."
-          ,"recovery_target_percent": "Reserve charged after a confirmed empty-battery outage, even without surplus."
+          "minimum_probe_surplus_w": "Minimum positive net grid export required before the startup timer begins.",
+          "load_outage_duration_s": "How long both protected-load meters must be unavailable before the battery is treated as empty.",
+          "load_recovery_duration_s": "How long both protected-load meters must remain available before reserve recovery may finish.",
+          "reserve_start_percent": "At or below this estimate, charge from the grid to protect the load from battery power loss.",
+          "recovery_target_percent": "Continue forced reserve charging to this level before returning to surplus-only control."
         }
       }
     }

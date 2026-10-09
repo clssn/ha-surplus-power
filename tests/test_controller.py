@@ -363,6 +363,72 @@ def test_sustained_load_meter_outage_starts_empty_battery_recovery() -> None:
     assert controller.next_deadline == NOW + timedelta(days=7)
 
 
+def test_low_estimated_reserve_forces_grid_charging_with_hysteresis() -> None:
+    controller = configured_controller(
+        capacity_wh=1000,
+        charging_efficiency=0.8,
+        reserve_start_fraction=0.2,
+        recovery_target_fraction=0.3,
+        load_recovery_duration=timedelta(seconds=30),
+    )
+    controller.persisted.estimated_energy_wh = 200
+
+    started = controller.update(
+        snapshot(charger_energy_kwh=10, load_energy_kwh=4, surplus_power_w=-500)
+    )
+    assert started.state is ControllerState.RECOVERING
+    assert started.command is ChargerCommand.TURN_ON
+
+    controller.update(
+        snapshot(
+            1,
+            charger_is_on=True,
+            charger_energy_kwh=10,
+            load_energy_kwh=4,
+            surplus_power_w=-500,
+        )
+    )
+    below_target = controller.update(
+        snapshot(
+            30,
+            charger_is_on=True,
+            charger_energy_kwh=10.1,
+            load_energy_kwh=4,
+            surplus_power_w=-500,
+        )
+    )
+    assert controller.persisted.estimated_energy_wh == pytest.approx(280)
+    assert below_target.state is ControllerState.RECOVERING
+    assert below_target.command is None
+
+    recovered = controller.update(
+        snapshot(
+            31,
+            charger_is_on=True,
+            charger_energy_kwh=10.125,
+            load_energy_kwh=4,
+            surplus_power_w=-500,
+        )
+    )
+    assert controller.persisted.estimated_energy_wh == pytest.approx(300)
+    assert recovered.state is ControllerState.IDLE
+    assert recovered.command is ChargerCommand.TURN_OFF
+
+
+def test_estimate_above_reserve_start_does_not_force_grid_charging() -> None:
+    controller = configured_controller(
+        capacity_wh=1000,
+        reserve_start_fraction=0.2,
+        recovery_target_fraction=0.3,
+    )
+    controller.persisted.estimated_energy_wh = 201
+
+    result = controller.update(snapshot(surplus_power_w=-500))
+
+    assert result.state is ControllerState.IDLE
+    assert result.command is None
+
+
 @pytest.mark.parametrize("missing", ["load_power_w", "load_energy_kwh"])
 def test_one_missing_load_measurement_does_not_imply_empty_battery(missing: str) -> None:
     controller = configured_controller(load_outage_duration=timedelta(seconds=60))
@@ -381,6 +447,7 @@ def test_recovery_charges_to_reserve_then_stops_during_import() -> None:
         charging_efficiency=0.8,
         load_outage_duration=timedelta(seconds=60),
         load_recovery_duration=timedelta(seconds=30),
+        reserve_start_fraction=0.1,
         recovery_target_fraction=0.2,
     )
     controller.update(
@@ -434,6 +501,7 @@ def test_recovery_continues_as_normal_charging_when_exporting() -> None:
         charging_efficiency=0.8,
         load_outage_duration=timedelta(seconds=1),
         load_recovery_duration=timedelta(seconds=1),
+        reserve_start_fraction=0.1,
         recovery_target_fraction=0.2,
     )
     controller.update(snapshot(charger_energy_kwh=10, load_power_w=None, load_energy_kwh=None))
