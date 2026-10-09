@@ -52,6 +52,7 @@ SENSORS = (
             "disconnected",
             "needs_calibration",
             "calibrating",
+            "recovering",
             "idle",
             "probing",
             "charging",

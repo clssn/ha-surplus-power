@@ -19,6 +19,7 @@ class ControllerState(StrEnum):
     DISCONNECTED = "disconnected"
     NEEDS_CALIBRATION = "needs_calibration"
     CALIBRATING = "calibrating"
+    RECOVERING = "recovering"
     IDLE = "idle"
     PROBING = "probing"
     CHARGING = "charging"
@@ -49,6 +50,9 @@ class ControllerConfig:
     calibration_interval: timedelta = timedelta(days=7)
     disconnect_duration: timedelta = timedelta(seconds=60)
     reconnect_duration: timedelta = timedelta(seconds=30)
+    load_outage_duration: timedelta = timedelta(seconds=60)
+    load_recovery_duration: timedelta = timedelta(seconds=30)
+    recovery_target_fraction: float = 0.20
     switch_transition_timeout: timedelta = timedelta(seconds=10)
     minimum_observed_charging_power_w: float = 50.0
 
@@ -68,6 +72,12 @@ class ControllerConfig:
                 raise ValueError(f"{name} must be positive")
         if self.switch_transition_timeout <= timedelta(0):
             raise ValueError("switch_transition_timeout must be positive")
+        if self.load_outage_duration <= timedelta(0):
+            raise ValueError("load_outage_duration must be positive")
+        if self.load_recovery_duration < timedelta(0):
+            raise ValueError("load_recovery_duration must not be negative")
+        if not 0 < self.recovery_target_fraction <= 1:
+            raise ValueError("recovery_target_fraction must be in (0, 1]")
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +94,7 @@ class Inputs:
     surplus_power_w: float | None = None
     charger_power_w: float | None = None
     charger_energy_kwh: float | None = None
+    load_power_w: float | None = None
     load_energy_kwh: float | None = None
 
 
@@ -97,6 +108,7 @@ class PersistentState:
     previous_charger_energy_kwh: float | None = None
     previous_load_energy_kwh: float | None = None
     requires_recalibration: bool = True
+    recovery_required: bool = False
 
     def as_dict(self) -> dict[str, object]:
         """Return a JSON-serializable representation."""
@@ -109,6 +121,7 @@ class PersistentState:
             "previous_charger_energy_kwh": self.previous_charger_energy_kwh,
             "previous_load_energy_kwh": self.previous_load_energy_kwh,
             "requires_recalibration": self.requires_recalibration,
+            "recovery_required": self.recovery_required,
         }
 
     @classmethod
@@ -125,6 +138,7 @@ class PersistentState:
             previous_charger_energy_kwh=_optional_float(data.get("previous_charger_energy_kwh")),
             previous_load_energy_kwh=_optional_float(data.get("previous_load_energy_kwh")),
             requires_recalibration=bool(data.get("requires_recalibration", True)),
+            recovery_required=bool(data.get("recovery_required", False)),
         )
 
 
@@ -147,14 +161,17 @@ class SurplusPowerController:
     ) -> None:
         self.config = config
         self.persisted = persisted or PersistentState()
-        self.state = (
-            ControllerState.NEEDS_CALIBRATION
-            if self.persisted.requires_recalibration
-            else ControllerState.IDLE
-        )
+        if self.persisted.requires_recalibration:
+            self.state = ControllerState.NEEDS_CALIBRATION
+        elif self.persisted.recovery_required:
+            self.state = ControllerState.RECOVERING
+        else:
+            self.state = ControllerState.IDLE
         self._condition_since: datetime | None = None
         self._unavailable_since: datetime | None = None
         self._available_since: datetime | None = None
+        self._load_unavailable_since: datetime | None = None
+        self._load_available_since: datetime | None = None
         self._switch_on_requested_at: datetime | None = None
         self._probe_started_at: datetime | None = None
         self._probe_cooldown_until: datetime | None = None
@@ -199,6 +216,14 @@ class SurplusPowerController:
             deadlines.append(self._available_since + self.config.reconnect_duration)
         if self._unavailable_since is not None and self.state is not ControllerState.DISCONNECTED:
             deadlines.append(self._unavailable_since + self.config.disconnect_duration)
+        if self._load_unavailable_since is not None and self.state not in {
+            ControllerState.CALIBRATING,
+            ControllerState.DISCONNECTED,
+            ControllerState.RECOVERING,
+        }:
+            deadlines.append(self._load_unavailable_since + self.config.load_outage_duration)
+        if self.state is ControllerState.RECOVERING and self._load_available_since is not None:
+            deadlines.append(self._load_available_since + self.config.load_recovery_duration)
         if self.state is ControllerState.IDLE and self._probe_cooldown_until is not None:
             deadlines.append(self._probe_cooldown_until)
         if self.persisted.last_calibration is not None and not self.calibration_due:
@@ -208,6 +233,7 @@ class SurplusPowerController:
     def request_calibration(self) -> None:
         """Request calibration at the next input evaluation."""
         self.persisted.requires_recalibration = True
+        self.persisted.recovery_required = False
         if self.state not in {ControllerState.DISCONNECTED, ControllerState.CALIBRATING}:
             self.state = ControllerState.NEEDS_CALIBRATION
             self._condition_since = None
@@ -262,6 +288,8 @@ class SurplusPowerController:
             self.state = ControllerState.NEEDS_CALIBRATION
             self._reset_charge_session()
 
+        self._update_load_outage(inputs)
+
         if self.state is ControllerState.NEEDS_CALIBRATION and inputs.charger_available:
             self.state = ControllerState.CALIBRATING
             self._condition_since = None
@@ -270,6 +298,8 @@ class SurplusPowerController:
                 command = ChargerCommand.TURN_ON
         elif self.state is ControllerState.CALIBRATING:
             command = self._update_calibration(inputs)
+        elif self.state is ControllerState.RECOVERING:
+            command = self._update_recovering(inputs)
         elif self.state is ControllerState.IDLE:
             command = self._update_idle(inputs)
         elif self.state is ControllerState.PROBING:
@@ -378,6 +408,34 @@ class SurplusPowerController:
             return ChargerCommand.TURN_ON
         return None
 
+    def _update_recovering(self, inputs: Inputs) -> ChargerCommand | None:
+        """Restore a safe reserve after evidence that the battery was empty."""
+        if inputs.charger_power_w is None:
+            return ChargerCommand.TURN_OFF if inputs.charger_is_on is True else None
+        self._observe_charging_power(inputs.charger_power_w)
+        if self._full_power_detected(inputs):
+            return self._complete_full_detection(inputs)
+        if inputs.charger_is_on is not True:
+            return ChargerCommand.TURN_ON
+
+        target_wh = self.config.capacity_wh * self.config.recovery_target_fraction
+        load_stable = (
+            self._load_available_since is not None
+            and inputs.now - self._load_available_since >= self.config.load_recovery_duration
+        )
+        if self.persisted.estimated_energy_wh < target_wh or not load_stable:
+            return None
+
+        self.persisted.recovery_required = False
+        self._condition_since = None
+        self._reset_charge_session()
+        if inputs.surplus_power_w is not None and inputs.surplus_power_w >= 0:
+            self.state = ControllerState.CHARGING
+            self._observe_charging_power(inputs.charger_power_w)
+            return None
+        self.state = ControllerState.IDLE
+        return ChargerCommand.TURN_OFF
+
     def _update_full(self, inputs: Inputs) -> ChargerCommand | None:
         if inputs.charger_is_on is False:
             self.state = ControllerState.IDLE
@@ -431,6 +489,7 @@ class SurplusPowerController:
         self.persisted.estimated_energy_wh = self.config.capacity_wh
         self.persisted.last_calibration = inputs.now
         self.persisted.requires_recalibration = False
+        self.persisted.recovery_required = False
         self._condition_since = None
         self._probe_cooldown_until = None
         self._reset_charge_session()
@@ -490,6 +549,34 @@ class SurplusPowerController:
             max(0.0, self.persisted.estimated_energy_wh + delta_wh),
         )
 
+    def _update_load_outage(self, inputs: Inputs) -> None:
+        """Detect a sustained loss of both battery-powered load measurements."""
+        both_missing = inputs.load_power_w is None and inputs.load_energy_kwh is None
+        both_available = inputs.load_power_w is not None and inputs.load_energy_kwh is not None
+
+        if both_missing:
+            self._load_available_since = None
+            if self._load_unavailable_since is None:
+                self._load_unavailable_since = inputs.now
+            if (
+                self.state is not ControllerState.CALIBRATING
+                and inputs.now - self._load_unavailable_since >= self.config.load_outage_duration
+                and self.state is not ControllerState.RECOVERING
+            ):
+                self.persisted.estimated_energy_wh = 0.0
+                self.persisted.recovery_required = True
+                self.state = ControllerState.RECOVERING
+                self._condition_since = None
+                self._reset_charge_session()
+            return
+
+        self._load_unavailable_since = None
+        if both_available and self.state is ControllerState.RECOVERING:
+            if self._load_available_since is None:
+                self._load_available_since = inputs.now
+        else:
+            self._load_available_since = None
+
     @staticmethod
     def _positive_delta(current: float | None, previous: float | None) -> float:
         if current is None or previous is None or not isfinite(current) or not isfinite(previous):
@@ -511,6 +598,7 @@ class SurplusPowerController:
             state.previous_charger_energy_kwh,
             state.previous_load_energy_kwh,
             state.requires_recalibration,
+            state.recovery_required,
         )
 
 

@@ -26,6 +26,9 @@ CONF_FULL_DETECTION_DURATION_S = "full_detection_duration_s"
 CONF_CALIBRATION_INTERVAL_DAYS = "calibration_interval_days"
 CONF_DISCONNECT_DURATION_S = "disconnect_duration_s"
 CONF_RECONNECT_DURATION_S = "reconnect_duration_s"
+CONF_LOAD_OUTAGE_DURATION_S = "load_outage_duration_s"
+CONF_LOAD_RECOVERY_DURATION_S = "load_recovery_duration_s"
+CONF_RECOVERY_TARGET_PERCENT = "recovery_target_percent"
 
 DEFAULTS: Final = {
     CONF_CAPACITY_WH: 1056.0,
@@ -41,6 +44,9 @@ DEFAULTS: Final = {
     CONF_CALIBRATION_INTERVAL_DAYS: 7,
     CONF_DISCONNECT_DURATION_S: 60,
     CONF_RECONNECT_DURATION_S: 30,
+    CONF_LOAD_OUTAGE_DURATION_S: 60,
+    CONF_LOAD_RECOVERY_DURATION_S: 30,
+    CONF_RECOVERY_TARGET_PERCENT: 20,
 }
 
 STORAGE_VERSION = 1
@@ -67,4 +73,7 @@ def controller_config_from_mapping(data: dict[str, object]):
         calibration_interval=timedelta(days=float(values[CONF_CALIBRATION_INTERVAL_DAYS])),
         disconnect_duration=timedelta(seconds=float(values[CONF_DISCONNECT_DURATION_S])),
         reconnect_duration=timedelta(seconds=float(values[CONF_RECONNECT_DURATION_S])),
+        load_outage_duration=timedelta(seconds=float(values[CONF_LOAD_OUTAGE_DURATION_S])),
+        load_recovery_duration=timedelta(seconds=float(values[CONF_LOAD_RECOVERY_DURATION_S])),
+        recovery_target_fraction=float(values[CONF_RECOVERY_TARGET_PERCENT]) / 100,
     )

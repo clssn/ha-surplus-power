@@ -91,6 +91,7 @@ Prefer an explicit state machine:
 - `DISCONNECTED`
 - `NEEDS_CALIBRATION`
 - `CALIBRATING`
+- `RECOVERING`
 - `IDLE`
 - `PROBING`
 - `CHARGING`
@@ -151,6 +152,13 @@ Be robust against:
 Do not silently interpret negative cumulative-energy deltas as real energy flow.
 
 The power station may perform AC bypass/pass-through while simultaneously charging and powering the load. Keep this part of the model isolated enough to change later if measurements show that simple accounting is inaccurate.
+
+If both protected-load power and cumulative-energy measurements remain
+unavailable for 60 seconds, treat that as physical evidence that the battery is
+empty: reset the estimate to zero and force charging. Once both measurements
+have been stable for 30 seconds, charge to a configurable safe reserve,
+initially 20%, before returning to surplus-only operation. Do not infer an empty
+battery from one missing measurement or a brief outage.
 
 ## Full-charge calibration
 

@@ -34,6 +34,8 @@ def snapshot(seconds: int = 0, **overrides: object) -> Inputs:
         "charger_is_on": False,
         "surplus_power_w": 400,
         "charger_power_w": 300,
+        "load_power_w": 20,
+        "load_energy_kwh": 4,
     }
     values.update(overrides)
     return Inputs(**values)  # type: ignore[arg-type]
@@ -345,6 +347,135 @@ def test_persisted_state_restores_without_forcing_calibration() -> None:
     assert restored.estimated_soc == pytest.approx(800 / 1056 * 100)
 
 
+def test_sustained_load_meter_outage_starts_empty_battery_recovery() -> None:
+    controller = configured_controller(load_outage_duration=timedelta(seconds=60))
+
+    controller.update(snapshot(load_power_w=None, load_energy_kwh=None))
+    brief = controller.update(snapshot(59, load_power_w=None, load_energy_kwh=None))
+    assert brief.state is ControllerState.IDLE
+    assert controller.persisted.estimated_energy_wh == 500
+
+    recovery = controller.update(snapshot(60, load_power_w=None, load_energy_kwh=None))
+    assert recovery.state is ControllerState.RECOVERING
+    assert recovery.command is ChargerCommand.TURN_ON
+    assert controller.persisted.estimated_energy_wh == 0
+    assert controller.persisted.recovery_required is True
+    assert controller.next_deadline == NOW + timedelta(days=7)
+
+
+@pytest.mark.parametrize("missing", ["load_power_w", "load_energy_kwh"])
+def test_one_missing_load_measurement_does_not_imply_empty_battery(missing: str) -> None:
+    controller = configured_controller(load_outage_duration=timedelta(seconds=60))
+
+    controller.update(snapshot(surplus_power_w=0, **{missing: None}))
+    result = controller.update(snapshot(60, surplus_power_w=0, **{missing: None}))
+
+    assert result.state is ControllerState.IDLE
+    assert controller.persisted.estimated_energy_wh == 500
+    assert controller.persisted.recovery_required is False
+
+
+def test_recovery_charges_to_reserve_then_stops_during_import() -> None:
+    controller = configured_controller(
+        capacity_wh=1000,
+        charging_efficiency=0.8,
+        load_outage_duration=timedelta(seconds=60),
+        load_recovery_duration=timedelta(seconds=30),
+        recovery_target_fraction=0.2,
+    )
+    controller.update(
+        snapshot(
+            charger_energy_kwh=10,
+            load_power_w=None,
+            load_energy_kwh=None,
+            surplus_power_w=-100,
+        )
+    )
+    controller.update(
+        snapshot(
+            60,
+            charger_energy_kwh=10,
+            load_power_w=None,
+            load_energy_kwh=None,
+            surplus_power_w=-100,
+        )
+    )
+    controller.update(
+        snapshot(
+            61,
+            charger_is_on=True,
+            charger_energy_kwh=10,
+            load_power_w=20,
+            load_energy_kwh=4,
+            surplus_power_w=-100,
+        )
+    )
+
+    result = controller.update(
+        snapshot(
+            91,
+            charger_is_on=True,
+            charger_energy_kwh=10.25,
+            load_power_w=20,
+            load_energy_kwh=4,
+            surplus_power_w=-100,
+        )
+    )
+
+    assert controller.persisted.estimated_energy_wh == pytest.approx(200)
+    assert controller.persisted.recovery_required is False
+    assert result.state is ControllerState.IDLE
+    assert result.command is ChargerCommand.TURN_OFF
+
+
+def test_recovery_continues_as_normal_charging_when_exporting() -> None:
+    controller = configured_controller(
+        capacity_wh=1000,
+        charging_efficiency=0.8,
+        load_outage_duration=timedelta(seconds=1),
+        load_recovery_duration=timedelta(seconds=1),
+        recovery_target_fraction=0.2,
+    )
+    controller.update(snapshot(charger_energy_kwh=10, load_power_w=None, load_energy_kwh=None))
+    controller.update(snapshot(1, charger_energy_kwh=10, load_power_w=None, load_energy_kwh=None))
+    controller.update(
+        snapshot(
+            2,
+            charger_is_on=True,
+            charger_energy_kwh=10,
+            load_power_w=20,
+            load_energy_kwh=4,
+        )
+    )
+    result = controller.update(
+        snapshot(
+            3,
+            charger_is_on=True,
+            charger_energy_kwh=10.25,
+            load_power_w=20,
+            load_energy_kwh=4,
+        )
+    )
+
+    assert result.state is ControllerState.CHARGING
+    assert result.command is None
+    assert controller.persisted.recovery_required is False
+
+
+def test_recovery_requirement_survives_restart() -> None:
+    persisted = PersistentState(
+        estimated_energy_wh=0,
+        last_calibration=NOW,
+        requires_recalibration=False,
+        recovery_required=True,
+    )
+
+    restored = SurplusPowerController(ControllerConfig(), persisted)
+
+    assert restored.state is ControllerState.RECOVERING
+    assert restored.update(snapshot()).command is ChargerCommand.TURN_ON
+
+
 def test_persistent_state_round_trip() -> None:
     original = PersistentState(
         estimated_energy_wh=321.5,
@@ -353,6 +484,7 @@ def test_persistent_state_round_trip() -> None:
         previous_charger_energy_kwh=12.3,
         previous_load_energy_kwh=4.5,
         requires_recalibration=False,
+        recovery_required=True,
     )
     assert PersistentState.from_dict(original.as_dict()) == original
 

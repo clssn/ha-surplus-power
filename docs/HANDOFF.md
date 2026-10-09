@@ -127,6 +127,7 @@ Fail safely with respect to charging:
 - DISCONNECTED
 - NEEDS_CALIBRATION
 - CALIBRATING
+- RECOVERING
 - IDLE
 - PROBING
 - CHARGING
@@ -172,6 +173,9 @@ Configuration/options should include at least:
 - forced calibration interval, default 7 days
 - disconnect grace period, default 60 s
 - reconnect stabilization duration, default 30 s
+- empty-battery load-meter outage duration, default 60 s
+- load-meter recovery stabilization duration, default 30 s
+- empty-battery recovery target, default 20%
 
 Prefer an Options Flow for tunables instead of exposing lots of `number` helpers.
 
@@ -227,6 +231,7 @@ Before live deployment, implement focused unit tests for at least:
 - disconnected state
 - brief unavailability does not force recalibration
 - reconnect requires recalibration
+- sustained loss of both protected-load meters resets SOC and restores a safe reserve
 - HA restart with persisted state
 - missing surplus data while charging
 - missing charger power while charging

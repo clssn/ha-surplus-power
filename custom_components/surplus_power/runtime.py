@@ -114,6 +114,7 @@ class SurplusPowerRuntime:
         charger_energy = self.hass.states.get(self.settings[CONF_CHARGER_ENERGY_ENTITY])
         surplus = self.hass.states.get(self.settings[CONF_SURPLUS_POWER_ENTITY])
         load_energy = self.hass.states.get(self.settings[CONF_LOAD_ENERGY_ENTITY])
+        load_power = self.hass.states.get(self.settings[CONF_LOAD_POWER_ENTITY])
         return Inputs(
             now=datetime.now(UTC),
             charger_available=_available(switch) and _available(charger_energy),
@@ -121,6 +122,7 @@ class SurplusPowerRuntime:
             surplus_power_w=_number(surplus),
             charger_power_w=_number(charger_power),
             charger_energy_kwh=_energy_kwh(charger_energy),
+            load_power_w=_number(load_power),
             load_energy_kwh=_energy_kwh(load_energy),
         )
 
