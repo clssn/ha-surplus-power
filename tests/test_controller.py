@@ -169,6 +169,15 @@ def test_cumulative_energy_updates_battery_estimate() -> None:
     assert controller.persisted.estimated_energy_wh == pytest.approx(560)
 
 
+def test_load_energy_factor_corrects_underestimated_discharge() -> None:
+    controller = configured_controller(load_energy_factor=1.45)
+    controller.update(snapshot(charger_energy_kwh=10, load_energy_kwh=4))
+
+    controller.update(snapshot(1, charger_energy_kwh=10, load_energy_kwh=4.1))
+
+    assert controller.persisted.estimated_energy_wh == pytest.approx(355)
+
+
 def test_negative_meter_delta_is_not_applied() -> None:
     controller = configured_controller()
     controller.update(snapshot(charger_energy_kwh=10, load_energy_kwh=4))

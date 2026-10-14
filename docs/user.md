@@ -90,6 +90,14 @@ The battery estimate uses cumulative charging and protected-load energy. It
 remains an estimate: charging efficiency, meter resets, AC bypass behavior, and
 device removal can all affect accuracy.
 
+The **Protected-load energy factor** multiplies measured load energy only inside
+the battery model. Leave it at `1.0` when no correction is known. If a discharge
+cycle starts from a reliable full calibration, estimate an initial correction
+as `actual percentage drop / estimated percentage drop`; for example, an actual
+67% drop versus an estimated 46% drop suggests approximately `1.46`. Recheck it
+over later cycles because a constant inverter overhead may not scale perfectly
+with changing load.
+
 When estimated charge reaches the configured minimum reserve (20% by default),
 the controller enters `RECOVERING` and turns charging on even without surplus.
 It continues to a higher recovery target (30% by default) before returning to
@@ -133,7 +141,8 @@ These entities report controller state; no additional automations are required.
 ## Options
 
 Open the integration's **Configure** dialog to adjust nominal capacity, charging
-efficiency, minimum surplus and duration before probing, probe duration, quick
+efficiency, protected-load energy factor, minimum surplus and duration before
+probing, probe duration, quick
 probe-stop duration, probe cooldown, normal stop duration, full-detection
 threshold and duration, periodic calibration interval, disconnect grace period,
 reconnect duration, minimum reserve and recovery target, and empty-battery

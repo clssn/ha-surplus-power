@@ -39,6 +39,7 @@ class ControllerConfig:
 
     capacity_wh: float = 1056.0
     charging_efficiency: float = 0.80
+    load_energy_factor: float = 1.0
     minimum_probe_surplus_w: float = 50.0
     start_duration: timedelta = timedelta(seconds=60)
     probe_duration: timedelta = timedelta(seconds=60)
@@ -62,6 +63,8 @@ class ControllerConfig:
             raise ValueError("capacity_wh must be positive")
         if not 0 < self.charging_efficiency <= 1:
             raise ValueError("charging_efficiency must be in (0, 1]")
+        if self.load_energy_factor <= 0:
+            raise ValueError("load_energy_factor must be positive")
         if self.minimum_probe_surplus_w < 0:
             raise ValueError("minimum_probe_surplus_w must not be negative")
         for name, duration in (
@@ -547,7 +550,10 @@ class SurplusPowerController:
         self.persisted.previous_charger_energy_kwh = inputs.charger_energy_kwh
         self.persisted.previous_load_energy_kwh = inputs.load_energy_kwh
 
-        delta_wh = charge_delta * 1000 * self.config.charging_efficiency - load_delta * 1000
+        delta_wh = (
+            charge_delta * 1000 * self.config.charging_efficiency
+            - load_delta * 1000 * self.config.load_energy_factor
+        )
         self.persisted.estimated_energy_wh = min(
             self.config.capacity_wh,
             max(0.0, self.persisted.estimated_energy_wh + delta_wh),

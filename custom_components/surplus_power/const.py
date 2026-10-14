@@ -15,6 +15,7 @@ CONF_LOAD_ENERGY_ENTITY = "load_energy_entity"
 
 CONF_CAPACITY_WH = "capacity_wh"
 CONF_CHARGING_EFFICIENCY = "charging_efficiency"
+CONF_LOAD_ENERGY_FACTOR = "load_energy_factor"
 CONF_MINIMUM_PROBE_SURPLUS_W = "minimum_probe_surplus_w"
 CONF_START_DURATION_S = "start_duration_s"
 CONF_PROBE_DURATION_S = "probe_duration_s"
@@ -34,6 +35,7 @@ CONF_RECOVERY_TARGET_PERCENT = "recovery_target_percent"
 DEFAULTS: Final = {
     CONF_CAPACITY_WH: 1056.0,
     CONF_CHARGING_EFFICIENCY: 0.80,
+    CONF_LOAD_ENERGY_FACTOR: 1.0,
     CONF_MINIMUM_PROBE_SURPLUS_W: 50.0,
     CONF_START_DURATION_S: 60,
     CONF_PROBE_DURATION_S: 60,
@@ -70,6 +72,7 @@ def controller_config_from_mapping(data: dict[str, object]):
     return ControllerConfig(
         capacity_wh=float(values[CONF_CAPACITY_WH]),
         charging_efficiency=float(values[CONF_CHARGING_EFFICIENCY]),
+        load_energy_factor=float(values[CONF_LOAD_ENERGY_FACTOR]),
         minimum_probe_surplus_w=float(values[CONF_MINIMUM_PROBE_SURPLUS_W]),
         start_duration=timedelta(seconds=float(values[CONF_START_DURATION_S])),
         probe_duration=timedelta(seconds=float(values[CONF_PROBE_DURATION_S])),

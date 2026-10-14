@@ -57,6 +57,7 @@
         "data": {
           "capacity_wh": "Nominal capacity (Wh)",
           "charging_efficiency": "Charging efficiency",
+          "load_energy_factor": "Protected-load energy factor",
           "minimum_probe_surplus_w": "Minimum surplus before probing (W)",
           "start_duration_s": "Start duration (seconds)",
           "probe_duration_s": "Probe duration (seconds)",
@@ -75,6 +76,7 @@
         },
         "data_description": {
           "minimum_probe_surplus_w": "Minimum positive net grid export required before the startup timer begins.",
+          "load_energy_factor": "Multiplier applied to measured protected-load energy to account for inverter losses, battery overhead, or systematic meter under-reporting.",
           "load_outage_duration_s": "How long both protected-load meters must be unavailable before the battery is treated as empty.",
           "load_recovery_duration_s": "How long both protected-load meters must remain available before reserve recovery may finish.",
           "reserve_start_percent": "At or below this estimate, charge from the grid to protect the load from battery power loss.",

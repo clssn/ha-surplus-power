@@ -57,11 +57,15 @@ Model energy using cumulative energy sensor deltas where possible:
 
 battery_delta =
     charging_input_delta * charging_efficiency
-    - protected_load_energy_delta
+    - protected_load_energy_delta * load_energy_factor
 
 Initial charging efficiency:
 - 0.80
 - configurable
+
+Protected-load energy factor:
+- 1.0 initially
+- configurable to account for observed inverter/battery losses or meter bias
 
 Clamp estimated battery energy to `[0, capacity_wh]`.
 
@@ -166,6 +170,7 @@ Configuration/options should include at least:
 - probe import-stop duration, default 5 s
 - probe cooldown, default 5 minutes
 - charging efficiency, default 0.80
+- protected-load energy factor, default 1.0
 - start-condition duration, default 60 s
 - stop-condition duration, default 60 s
 - full-charge power threshold, default 10 W

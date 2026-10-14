@@ -139,7 +139,12 @@ Prefer cumulative energy measurements over integration of instantaneous power.
 
 Conceptually:
 
-`battery_delta = charge_energy_delta * efficiency - load_energy_delta`
+`battery_delta = charge_energy_delta * efficiency - load_energy_delta * load_energy_factor`
+
+The protected-load energy factor must be configurable, initially 1.0. It may
+account empirically for inverter losses, battery overhead, or systematic
+under-reporting by the load meter without embedding installation-specific
+corrections in the controller.
 
 Clamp estimated battery energy to `[0, nominal_capacity]`.
 
